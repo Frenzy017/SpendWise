@@ -98,56 +98,93 @@ All endpoints except register and login need a JWT. Errors use the standard `Pro
 
 ## Traceability
 
-Each requirement from [spec.md](specs/spec.md) mapped to where it's implemented and where it's tested. Paths are relative to `src/` (code) and `tests/SpendWise.Services.Tests/` (tests). "Manual" means it was checked in the browser or against the running API (task T4.6 / T5.10).
+This section shows, for every requirement in [spec.md](specs/spec.md), **what it means in practice**, **where the code for it lives**, and **how we know it works**.
+
+- File paths start from `src/`. All tests are in `tests/SpendWise.Services.Tests/`.
+- **"Checked by hand"** means it was tested in the browser or by calling the running API (tasks T4.6 and T5.10).
 
 ### Functional requirements
 
-| ID | Requirement (short) | Implemented in | Tested by |
-|----|---------------------|----------------|-----------|
-| FR-AUTH-01 | Register, new accounts are Users | `Services/Implementations/AuthService.cs` (`RegisterAsync`), `Api/Controllers/AuthController.cs`, `Web/Controllers/AccountController.cs` | `AuthServiceTests`: `RegisterAsync_ValidRequest_CreatesUserRoleWithHashedPassword`, `RegisterAsync_PasswordWithoutLetterOrDigit_ThrowsBusinessRule` |
-| FR-AUTH-02 | Unique username and email, ignoring case | `AuthService.RegisterAsync`, unique indexes in `Data/Configurations/UserConfiguration.cs` | `AuthServiceTests`: `RegisterAsync_UsernameTakenWithDifferentCase_ThrowsConflict`, `RegisterAsync_EmailTakenWithDifferentCase_ThrowsConflict` |
-| FR-AUTH-03 | Signed JWT (2 h) with ID, name, role | `Services/Implementations/TokenService.cs`, JWT validation in `Api/Program.cs` | `TokenServiceTests` (both tests), `AuthServiceTests.LoginAsync_CorrectCredentialsAnyUsernameCase_ReturnsTokenAndUser` |
-| FR-AUTH-04 | Generic login error; own error for deactivated | `AuthService.LoginAsync`, `Api/Infrastructure/GlobalExceptionHandler.cs` | `AuthServiceTests`: `LoginAsync_WrongPassword_…`, `LoginAsync_UnknownUser_ThrowsSameGenericError`, `LoginAsync_DeactivatedUser_ThrowsForbidden` |
-| FR-AUTH-05 | JWT required everywhere except register/login | Fallback authorization policy in `Api/Program.cs`, `[AllowAnonymous]` in `AuthController` | Manual: request without a token returns 401 |
-| FR-CAT-01 | See global + own categories | `CategoryService.GetVisibleAsync`, `Internal/CategoryQueries.cs` | `CategoryServiceTests.GetVisibleAsync_ReturnsGlobalAndOwnButNotOthers_SortedByName` |
-| FR-CAT-02 | Create personal categories | `CategoryService.CreateAsync`, `Web/Controllers/CategoriesController.cs` | `CategoryServiceTests.CreateAsync_AsUser_CreatesPersonalCategory` |
-| FR-CAT-03 | Unique visible name, ignoring case | `CategoryService.EnsureNameIsAvailableAsync` | `CategoryServiceTests`: `CreateAsync_NameMatchesGlobalIgnoringCase_…`, `CreateAsync_NameMatchesOwnCategory_…`, `CreateAsync_NameMatchesAnotherUsersCategory_Succeeds`, `UpdateAsync_RenameToExistingName_…`, `UpdateAsync_SameNameDifferentCase_Succeeds` |
-| FR-CAT-04 | Edit/delete only own categories | `CategoryService.GetEditableAsync` | `CategoryServiceTests`: `UpdateAsync_OwnCategory_…`, `UpdateAsync_GlobalCategoryAsUser_ThrowsForbidden`, `UpdateAsync_AnotherUsersCategory_ThrowsNotFound`, `DeleteAsync_GlobalCategoryAsUser_ThrowsForbidden` |
-| FR-CAT-05 | Category in use can't be deleted | `CategoryService.DeleteAsync`, `Restrict` delete rules in `ExpenseConfiguration` / `BudgetConfiguration` | `CategoryServiceTests`: `DeleteAsync_CategoryWithExpenses_…`, `DeleteAsync_CategoryWithBudget_…`, `DeleteAsync_UnusedOwnCategory_RemovesIt` |
-| FR-CAT-06 | Admins manage global categories | `CategoryService.CreateAsync/UpdateAsync/DeleteAsync` (`isAdmin`) | `CategoryServiceTests`: `CreateAsync_AsAdmin_CreatesGlobalCategory`, `UpdateAsync_GlobalCategoryAsAdmin_Updates`, `DeleteAsync_GlobalCategoryUsedByAnyUser_AsAdmin_ThrowsConflict` |
-| FR-EXP-01 | Create expense (amount, date, category, note) | `ExpenseService.CreateAsync`, `Api/Controllers/ExpensesController.cs`, `Web/Views/Expenses/Form.cshtml` | `ExpenseServiceTests`: `CreateAsync_ValidRequest_…`, `CreateAsync_AmountOutOfRange_…`, `CreateAsync_BlankDescription_StoredAsNull` |
-| FR-EXP-02 | No future dates; category must be visible | `ExpenseService.ValidateAsync` | `ExpenseServiceTests`: `CreateAsync_FutureDate_…`, `CreateAsync_DateToday_Succeeds`, `CreateAsync_AnotherUsersCategory_…`, `UpdateAsync_FutureDate_…` |
-| FR-EXP-03 | List by month and category, newest first, paginated | `ExpenseService.GetPagedAsync`, `Web/Views/Expenses/Index.cshtml` | `ExpenseServiceTests`: `GetPagedAsync_NoMonthGiven_…`, `GetPagedAsync_CategoryFilter_…`, `GetPagedAsync_SecondPage_…`, `GetPagedAsync_InvalidMonth_…` |
-| FR-EXP-04 | Edit own expense | `ExpenseService.UpdateAsync` | `ExpenseServiceTests.UpdateAsync_OwnExpense_UpdatesFields` |
-| FR-EXP-05 | Delete own expense | `ExpenseService.DeleteAsync` | `ExpenseServiceTests.DeleteAsync_OwnExpense_RemovesIt` |
-| FR-EXP-06 | Other users' expenses → 404 | `ExpenseService.GetOwnAsync` | `ExpenseServiceTests`: `GetByIdAsync_AnotherUsersExpense_…`, `UpdateAsync_AnotherUsersExpense_…`, `DeleteAsync_AnotherUsersExpense_…`, `GetPagedAsync_OtherUsersExpenses_AreNotReturned` |
-| FR-BUD-01 | Set monthly limit (upsert, one per month) | `BudgetService.SetAsync`, unique index in `BudgetConfiguration` | `BudgetServiceTests`: `SetAsync_NoExistingBudget_…`, `SetAsync_ExistingBudget_UpdatesLimitWithoutDuplicate`, `SetAsync_InvisibleCategory_…`, `SetAsync_InvalidMonthOrLimit_…` |
-| FR-BUD-02 | List and delete budgets | `BudgetService.GetForMonthAsync/DeleteAsync`, `Web/Views/Budgets/Index.cshtml` | `BudgetServiceTests`: `GetForMonthAsync_ReturnsOnlyOwnBudgetsForThatMonth`, `DeleteAsync_OwnBudget_…`, `DeleteAsync_AnotherUsersBudget_…` |
-| FR-BUD-03 | Copy last month's budgets | `BudgetService.CopyFromPreviousMonthAsync` | `BudgetServiceTests`: `CopyFromPreviousMonthAsync_CopiesMissingAndSkipsExisting`, `CopyFromPreviousMonthAsync_January_…` |
-| FR-REP-01 | Monthly summary with previous-month change | `ReportService.GetMonthlySummaryAsync`, `Web/Views/Home/Index.cshtml` | `ReportServiceTests`: `…ComputesTotalCountAndPercentages`, `…ComparesWithPreviousMonth`, `…NoSpendingPreviousMonth_ChangePercentIsNull`, `…EmptyMonth_ReturnsZeros`, `…IgnoresOtherUsersData` |
-| FR-REP-02 | Per-category lines with budget and over-budget flag | `ReportService.GetMonthlySummaryAsync` | `ReportServiceTests`: `…PercentagesRoundedToOneDecimal`, `…SpentOverLimit_…`, `…SpentEqualsLimit_…`, `…NoBudget_NeverOverBudget`, `…BudgetWithoutSpending_AppearsWithZero`, `…SortsCategoriesBySpentDescending` |
-| FR-REP-03 | N-month trend, zero-filled | `ReportService.GetTrendAsync`, bar chart in `Home/Index.cshtml` | `ReportServiceTests`: `GetTrendAsync_SpansYearBoundaryAndZeroFillsMissingMonths`, `GetTrendAsync_MonthsOutOfRange_…` |
-| FR-ADM-01 | List users with expense counts | `UserAdminService.GetUsersAsync`, `Web/Views/Admin/Users.cshtml` | `UserAdminServiceTests.GetUsersAsync_ReturnsAllUsersWithExpenseCountsSortedByUsername` |
-| FR-ADM-02 | Activate/deactivate, not yourself | `UserAdminService.SetStatusAsync` | `UserAdminServiceTests`: `SetStatusAsync_Deactivate_…`, `SetStatusAsync_Reactivate_…`, `SetStatusAsync_OwnAccount_…`, `SetStatusAsync_UnknownUser_…` |
-| FR-ADM-03 | Non-admins get 403 | `[Authorize(Roles = Roles.Admin)]` on `Api/Controllers/AdminController.cs` and `Web/Controllers/AdminController.cs` | Manual: `maria` gets 403 from `/api/admin/users` and "Access denied" in the web client |
-| FR-WEB-01 | All client pages | `Web/Controllers/*`, `Web/Views/*` | Manual browser run-through of US-01…US-12 (T5.10) |
-| FR-WEB-02 | HTTP only; JWT in HttpOnly cookie | `Web/ApiClient/SpendWiseApiClient.cs`, `Web/ApiClient/BearerTokenHandler.cs`, cookie setup in `Web/Program.cs`; Web references only Contracts | Manual + project references (`SpendWise.Web.csproj`) |
-| FR-WEB-03 | Friendly errors; 401 → login | `Web/Infrastructure/ApiExceptionFilter.cs`, `Web/Infrastructure/ModelStateExtensions.cs` | Manual: validation, duplicate and in-use errors shown in forms and alerts |
-| FR-WEB-04 | Admin links only for admins | `Web/Views/Shared/_Layout.cshtml` | Manual: navbar as `maria` vs `admin` |
+#### Accounts and login
+
+| ID | What it means | Where it lives | How it's checked |
+|----|---------------|----------------|------------------|
+| FR-AUTH-01 | Anyone can sign up. New accounts are always ordinary users, never admins. | `Services/Implementations/AuthService.cs`, the Register page in `Web/Controllers/AccountController.cs` | `AuthServiceTests`: a valid sign-up creates a User with a hashed password; a password with no letter or no digit is rejected. |
+| FR-AUTH-02 | Two people can't share a username or email, even if the capitals differ ("Maria" = "maria"). | `AuthService.cs`, plus unique indexes in `Data/Configurations/UserConfiguration.cs` | `AuthServiceTests`: a taken username or email in different case is rejected. |
+| FR-AUTH-03 | Logging in gives you a signed token that's valid for 2 hours and says who you are and what your role is. | `Services/Implementations/TokenService.cs`; the API checks the token in `Api/Program.cs` | `TokenServiceTests`; `AuthServiceTests`: login works whatever case you type the username in. |
+| FR-AUTH-04 | A wrong password and an unknown user give the same message, so attackers can't guess usernames. A deactivated account gets its own message. | `AuthService.cs`, `Api/Infrastructure/GlobalExceptionHandler.cs` | `AuthServiceTests`: wrong password and unknown user give the same error; a deactivated user is refused. |
+| FR-AUTH-05 | Every API endpoint needs you to be logged in, except sign-up and login. | Default "must be logged in" rule in `Api/Program.cs` | Checked by hand: a request without a token gets 401. |
+
+#### Categories
+
+| ID | What it means | Where it lives | How it's checked |
+|----|---------------|----------------|------------------|
+| FR-CAT-01 | You see the shared categories (Food, Clothes…) plus the ones you made yourself, never anyone else's. | `CategoryService.cs`, `Services/Internal/CategoryQueries.cs` | `CategoryServiceTests`: you get shared + own categories, not other users', sorted by name. |
+| FR-CAT-02 | You can make your own categories, e.g. "Gym". | `CategoryService.cs`, `Web/Controllers/CategoriesController.cs` | `CategoryServiceTests`: a user creates a personal category. |
+| FR-CAT-03 | You can't have two categories with the same name (ignoring capitals). Another user may use the same name. | `CategoryService.cs` | `CategoryServiceTests`: clashes with a shared or own name are rejected, a name another user has is allowed, and renaming works. |
+| FR-CAT-04 | You can only edit or delete your own categories, not the shared ones or other people's. | `CategoryService.cs` | `CategoryServiceTests`: editing your own works; shared ones are forbidden; another user's look like they don't exist. |
+| FR-CAT-05 | A category that still has expenses or budgets can't be deleted, so no data is lost. | `CategoryService.cs`, plus delete rules in the database configuration | `CategoryServiceTests`: a category with expenses or a budget can't be deleted; an unused one can. |
+| FR-CAT-06 | Admins manage the shared category list. | `CategoryService.cs` | `CategoryServiceTests`: an admin creates and edits shared categories but can't delete one that's in use. |
+
+#### Expenses
+
+| ID | What it means | Where it lives | How it's checked |
+|----|---------------|----------------|------------------|
+| FR-EXP-01 | You record an expense: amount, date, category and an optional note. | `ExpenseService.cs`, the form in `Web/Views/Expenses/Form.cshtml` | `ExpenseServiceTests`: a valid expense is saved; an amount out of range is rejected; an empty note is stored as empty. |
+| FR-EXP-02 | You can't enter an expense dated in the future, or put it in a category you can't see. | `ExpenseService.cs` | `ExpenseServiceTests`: a future date is rejected and today is allowed; another user's category is rejected. |
+| FR-EXP-03 | You browse one month at a time, optionally one category, newest first, a page at a time. | `ExpenseService.cs`, `Web/Views/Expenses/Index.cshtml` | `ExpenseServiceTests`: defaults to this month; category filter, paging and invalid months behave correctly. |
+| FR-EXP-04 | You can fix a wrong expense. | `ExpenseService.cs` | `ExpenseServiceTests`: editing updates all fields. |
+| FR-EXP-05 | You can delete an expense. | `ExpenseService.cs` | `ExpenseServiceTests`: deleting removes it. |
+| FR-EXP-06 | Other people's expenses are invisible to you: the app answers "not found" rather than "forbidden", so it doesn't even reveal they exist. | `ExpenseService.cs` | `ExpenseServiceTests`: viewing, editing, deleting or listing another user's expenses never works. |
+
+#### Budgets
+
+| ID | What it means | Where it lives | How it's checked |
+|----|---------------|----------------|------------------|
+| FR-BUD-01 | You set a monthly limit per category (e.g. Going out: €150). Setting it again changes the limit instead of adding a second one. | `BudgetService.cs`, unique index in the database | `BudgetServiceTests`: a new budget is created; setting it again updates it; invalid values are rejected. |
+| FR-BUD-02 | You see your budgets for a month and can delete them. | `BudgetService.cs`, `Web/Views/Budgets/Index.cshtml` | `BudgetServiceTests`: you only see your own budgets for that month and can only delete your own. |
+| FR-BUD-03 | One click copies last month's budgets into this month, skipping any you've already set. | `BudgetService.cs` | `BudgetServiceTests`: copies missing ones and skips existing ones; January correctly copies from last December. |
+
+#### Dashboard and reports
+
+| ID | What it means | Where it lives | How it's checked |
+|----|---------------|----------------|------------------|
+| FR-REP-01 | The dashboard shows the month's total and how it compares with last month. | `ReportService.cs`, `Web/Views/Home/Index.cshtml` | `ReportServiceTests`: totals and % change are right; there's no % if last month was zero; an empty month shows zeros; other users' data is ignored. |
+| FR-REP-02 | Each category shows how much you spent, its share of the total, your budget, and a warning if you went over. | `ReportService.cs` | `ReportServiceTests`: going over the limit is flagged, exactly hitting it is not; categories with no budget are never flagged; sorted by highest spending. |
+| FR-REP-03 | A bar chart shows your total for each of the last few months, including months where you spent nothing. | `ReportService.cs`, chart in `Web/Views/Home/Index.cshtml` | `ReportServiceTests`: works across a new year and fills empty months with zero. |
+
+#### Admin
+
+| ID | What it means | Where it lives | How it's checked |
+|----|---------------|----------------|------------------|
+| FR-ADM-01 | Admins see a list of all users and how many expenses each has (but not the expenses themselves). | `UserAdminService.cs`, `Web/Views/Admin/Users.cshtml` | `UserAdminServiceTests`: all users are listed with their counts. |
+| FR-ADM-02 | Admins can block or unblock accounts, but not their own. | `UserAdminService.cs` | `UserAdminServiceTests`: block, unblock, refusing to block yourself, and an unknown user. |
+| FR-ADM-03 | Ordinary users can't reach admin features. | Admin-only rule on both `AdminController.cs` files (API and web) | Checked by hand: `maria` gets "403 Forbidden" from the API and "Access denied" in the browser. |
+
+#### Web client
+
+| ID | What it means | Where it lives | How it's checked |
+|----|---------------|----------------|------------------|
+| FR-WEB-01 | The website has all the pages: Login, Register, Dashboard, Expenses, Categories, Budgets and Admin › Users. | `Web/Controllers/`, `Web/Views/` | Checked by hand: went through every user story (US-01 to US-12) in the browser. |
+| FR-WEB-02 | The website only talks to the API over HTTP. Your login token is kept in an encrypted cookie that page scripts can't read. | `Web/ApiClient/`, cookie setup in `Web/Program.cs` | Checked by hand; the web project doesn't reference the database or business-logic projects at all. |
+| FR-WEB-03 | Errors from the API appear as friendly messages, and an expired login sends you back to the login page. | `Web/Infrastructure/ApiExceptionFilter.cs` | Checked by hand: validation, duplicate-name and "in use" errors appear in the forms. |
+| FR-WEB-04 | Only admins see the Admin menu. | `Web/Views/Shared/_Layout.cshtml` | Checked by hand: the menu differs for `maria` and `admin`. |
 
 ### Non-functional requirements
 
-| ID | Requirement (short) | Where |
-|----|---------------------|-------|
-| NFR-01 | Separate API and client over HTTP | Two runnable projects, `SpendWiseApiClient` |
-| NFR-02 | Layered design with shared DTOs | Project references (plan §2), `Services/Mapping/MappingExtensions.cs` |
-| NFR-03 | Hashed passwords | `PasswordHasher<User>` in `AuthService` (test: `RegisterAsync_ValidRequest_…` checks the hash isn't the password) |
-| NFR-04 | Data isolation in the Services layer | `userId` filters in every service; tests named `…AnotherUsers…` / `…OtherUsers…` |
-| NFR-05 | JWT key from config, ≥ 256 bits | `appsettings*.json`, length check in `Api/Program.cs` |
-| NFR-06 | `ProblemDetails` errors, no leaks | `Api/Infrastructure/GlobalExceptionHandler.cs`, `UseStatusCodePages` |
-| NFR-07 | `decimal(18,2)`, DB constraints | `Data/Configurations/*`, `Data/Migrations/*_InitialCreate.cs` |
-| NFR-08 | Every business requirement tested | 78 xUnit tests (table above) |
-| NFR-09 | Works on a phone screen | Bootstrap 5 responsive layout (checked at 375 px width) |
-| NFR-10 | Fast, paginated lists | Paginated `/api/expenses`, index on (UserId, Date) |
-| NFR-11 | Only the .NET SDK needed; auto setup | `Database.Migrate()` + `DbSeeder` on API startup |
-| NFR-12 | Swagger + README | Swagger UI at `/swagger`, this README |
+These are about *how well* the system works rather than *what* it does.
+
+| ID | What it means | How the project meets it |
+|----|---------------|--------------------------|
+| NFR-01 | **Distributed.** The API and the website are two separate programs that talk over the network. | Two projects you start separately (ports 5080 and 5090). The website calls the API through `SpendWiseApiClient`. |
+| NFR-02 | **Clean layers.** Each part of the code has one job and only depends on the layer below it. | Data → Services → Api, plus a shared Contracts project for the data sent between them. Database objects are converted to DTOs in `Services/Mapping/MappingExtensions.cs` and never leave the Services layer. |
+| NFR-03 | **Passwords are safe.** They're never stored as plain text. | Passwords are hashed with ASP.NET Core's `PasswordHasher`. A test checks that the stored value isn't the password. |
+| NFR-04 | **Your data is private.** The protection lives in the business logic, not just in the screens, so it can't be bypassed by calling the API directly. | Every service filters by the logged-in user's ID. Tests try to reach other users' data and confirm it fails. |
+| NFR-05 | **The token signing key is secure.** It's long enough and isn't hard-coded. | The key is read from `appsettings*.json`, and the API refuses to start if it's shorter than 256 bits. |
+| NFR-06 | **Errors are clear and safe.** Errors come in a standard format with the right status code, and never expose internal details. | `Api/Infrastructure/GlobalExceptionHandler.cs` converts every error to the standard `ProblemDetails` format. |
+| NFR-07 | **Money and data are stored correctly.** No rounding errors, and the database itself blocks invalid data. | Amounts use `decimal(18,2)`. Unique keys and foreign keys are defined in `Data/Configurations/`. |
+| NFR-08 | **Everything is tested.** Every business rule has at least one automated test. | 78 xUnit tests, all passing (see the tables above). |
+| NFR-09 | **Works on a phone.** | Bootstrap 5 responsive layout, checked at a 375 px screen width. |
+| NFR-10 | **Fast.** Pages load quickly, even with a lot of data. | The expense list is paginated, and the database has an index on user and date. |
+| NFR-11 | **Easy to run.** Nothing to install except .NET. | On first start the API creates the SQLite database and fills it with demo data automatically. |
+| NFR-12 | **Documented.** | The API can be explored in Swagger at `/swagger`, and this README explains how to run everything. |
