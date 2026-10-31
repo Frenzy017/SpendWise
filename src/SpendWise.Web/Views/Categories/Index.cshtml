@@ -1,0 +1,67 @@
+@model CategoriesViewModel
+@{
+    ViewData["Title"] = "Categories";
+}
+<h1 class="h3 mb-3">Categories</h1>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <ul class="list-group list-group-flush">
+                @foreach (var c in Model.Categories)
+                {
+                    // Users edit their own categories; only admins edit global ones.
+                    var canEdit = !c.IsGlobal || Model.IsAdmin;
+                    <li class="list-group-item d-flex align-items-center gap-2">
+                        <span class="color-dot" style="background:@c.Color"></span>
+                        <span class="me-auto">@c.Name</span>
+                        @if (c.IsGlobal)
+                        {
+                            <span class="badge text-bg-light border">Global</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-info">Mine</span>
+                        }
+                        @if (canEdit)
+                        {
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@c.Id">Edit</a>
+                            <form asp-action="Delete" asp-route-id="@c.Id" method="post" class="d-inline"
+                                  onsubmit="return confirm('Delete category @c.Name?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5">Add a category</h2>
+                @if (Model.IsAdmin)
+                {
+                    <p class="small text-muted">As an admin, categories you add are <strong>global</strong> and visible to every user.</p>
+                }
+                else
+                {
+                    <p class="small text-muted">Your own categories are visible only to you.</p>
+                }
+                <form asp-action="Create" method="post">
+                    <div class="mb-3">
+                        <label asp-for="NewCategory.Name" class="form-label">Name</label>
+                        <input asp-for="NewCategory.Name" class="form-control" placeholder="e.g. Gym" />
+                        <span asp-validation-for="NewCategory.Name" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="NewCategory.Color" class="form-label">Colour</label>
+                        <input asp-for="NewCategory.Color" type="color" class="form-control form-control-color" />
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add category</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

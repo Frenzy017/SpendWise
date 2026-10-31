@@ -1,0 +1,16 @@
+@model MonthPickerModel
+@{
+    var today = DateTime.Today;
+    var isCurrent = Model.Year == today.Year && Model.Month == today.Month;
+}
+<div class="d-flex align-items-center gap-2">
+    <a class="btn btn-outline-secondary btn-sm" asp-controller="@Model.Controller" asp-action="@Model.Action"
+       asp-route-year="@Model.Previous.Year" asp-route-month="@Model.Previous.Month" aria-label="Previous month">&lsaquo;</a>
+    <span class="fw-semibold text-center month-label">@Format.MonthName(Model.Year, Model.Month)</span>
+    <a class="btn btn-outline-secondary btn-sm" asp-controller="@Model.Controller" asp-action="@Model.Action"
+       asp-route-year="@Model.Next.Year" asp-route-month="@Model.Next.Month" aria-label="Next month">&rsaquo;</a>
+    @if (!isCurrent)
+    {
+        <a class="btn btn-link btn-sm" asp-controller="@Model.Controller" asp-action="@Model.Action">This month</a>
+    }
+</div>

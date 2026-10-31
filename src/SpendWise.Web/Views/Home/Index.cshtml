@@ -1,0 +1,174 @@
+@model DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+    var s = Model.Summary;
+    var overBudget = s.Categories.Count(c => c.IsOverBudget);
+}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Dashboard</h1>
+    <partial name="_MonthPicker" model='new MonthPickerModel(s.Year, s.Month, "Home", "Index")' />
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Spent this month</div>
+                <div class="display-6 fw-semibold">@Format.Money(s.Total)</div>
+                <div class="text-muted small">@s.ExpenseCount expense(s)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Previous month</div>
+                <div class="fs-3 fw-semibold">@Format.Money(s.PreviousMonthTotal)</div>
+                @if (s.ChangePercent is decimal change)
+                {
+                    <span class="badge @(change > 0 ? "text-bg-danger" : "text-bg-success")">
+                        @(change > 0 ? "▲" : "▼") @Math.Abs(change)% vs last month
+                    </span>
+                }
+                else
+                {
+                    <span class="text-muted small">No spending to compare with</span>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-12 col-lg-4">
+        <div class="card shadow-sm h-100 @(overBudget > 0 ? "border-danger" : "")">
+            <div class="card-body">
+                <div class="text-muted small">Budgets</div>
+                @if (overBudget > 0)
+                {
+                    <div class="fs-3 fw-semibold text-danger">@overBudget over budget</div>
+                    <div class="small text-danger">@string.Join(", ", s.Categories.Where(c => c.IsOverBudget).Select(c => c.CategoryName))</div>
+                }
+                else
+                {
+                    <div class="fs-3 fw-semibold text-success">All on track</div>
+                    <a class="small" asp-controller="Budgets" asp-action="Index" asp-route-year="@s.Year" asp-route-month="@s.Month">Manage budgets</a>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (s.Categories.Count == 0)
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-body text-center py-5">
+            <p class="text-muted mb-3">No expenses or budgets for @Format.MonthName(s.Year, s.Month) yet.</p>
+            <a class="btn btn-primary" asp-controller="Expenses" asp-action="Create">Add an expense</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold">Spending by category</div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th class="text-end">Spent</th>
+                                <th class="text-end">Share</th>
+                                <th class="text-end">Budget</th>
+                                <th class="text-end">Left</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in s.Categories)
+                            {
+                                <tr class="@(c.IsOverBudget ? "table-danger" : "")">
+                                    <td>
+                                        <span class="color-dot" style="background:@c.CategoryColor"></span>
+                                        @c.CategoryName
+                                        @if (c.IsOverBudget) { <span class="badge text-bg-danger ms-1">Over budget</span> }
+                                        @if (c.BudgetLimit is decimal limit)
+                                        {
+                                            var used = (int)Math.Min(100, c.Spent / limit * 100);
+                                            <div class="progress mt-1 budget-bar" role="progressbar" aria-label="Budget used" aria-valuenow="@used" aria-valuemin="0" aria-valuemax="100">
+                                                <div class="progress-bar @(c.IsOverBudget ? "bg-danger" : used >= 80 ? "bg-warning" : "bg-success")" style="width:@used%"></div>
+                                            </div>
+                                        }
+                                    </td>
+                                    <td class="text-end">@Format.Money(c.Spent)</td>
+                                    <td class="text-end">@c.PercentOfTotal%</td>
+                                    <td class="text-end">@(c.BudgetLimit is decimal b ? Format.Money(b) : "—")</td>
+                                    <td class="text-end @(c.Remaining < 0 ? "text-danger fw-semibold" : "")">@(c.Remaining is decimal r ? Format.Money(r) : "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-semibold">Where the money went</div>
+                <div class="card-body d-flex justify-content-center">
+                    @if (s.Total > 0)
+                    {
+                        <div class="chart-box"><canvas id="categoryChart" aria-label="Spending by category"></canvas></div>
+                    }
+                    else
+                    {
+                        <p class="text-muted my-auto">Nothing spent yet this month.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white fw-semibold">Last 6 months</div>
+    <div class="card-body">
+        <div class="trend-box"><canvas id="trendChart" aria-label="Monthly totals for the last 6 months"></canvas></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+        const categories = @Json.Serialize(s.Categories.Where(c => c.Spent > 0));
+        const trend = @Json.Serialize(Model.Trend.Select(t => new { label = Format.ShortMonth(t.Year, t.Month), total = t.Total }));
+        const euro = v => '€' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        const categoryCanvas = document.getElementById('categoryChart');
+        if (categoryCanvas) {
+            new Chart(categoryCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: categories.map(c => c.categoryName),
+                    datasets: [{ data: categories.map(c => c.spent), backgroundColor: categories.map(c => c.categoryColor) }]
+                },
+                options: {
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: { callbacks: { label: ctx => `${ctx.label}: ${euro(ctx.parsed)}` } }
+                    }
+                }
+            });
+        }
+
+        new Chart(document.getElementById('trendChart'), {
+            type: 'bar',
+            data: {
+                labels: trend.map(t => t.label),
+                datasets: [{ label: 'Total spent', data: trend.map(t => t.total), backgroundColor: '#0d6efd', borderRadius: 4 }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => euro(ctx.parsed.y) } } },
+                scales: { y: { beginAtZero: true, ticks: { callback: v => euro(v) } } }
+            }
+        });
+    </script>
+}

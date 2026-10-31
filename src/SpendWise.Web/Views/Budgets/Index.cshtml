@@ -1,0 +1,76 @@
+@model BudgetsViewModel
+@{
+    ViewData["Title"] = "Budgets";
+}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="h3 mb-0">Budgets</h1>
+    <partial name="_MonthPicker" model='new MonthPickerModel(Model.Year, Model.Month, "Budgets", "Index")' />
+    <form asp-action="CopyPrevious" method="post">
+        <input type="hidden" name="year" value="@Model.Year" />
+        <input type="hidden" name="month" value="@Model.Month" />
+        <button type="submit" class="btn btn-outline-primary">Copy last month's budgets</button>
+    </form>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            @if (Model.Budgets.Count == 0)
+            {
+                <div class="card-body text-center text-muted py-5">No budgets for @Format.MonthName(Model.Year, Model.Month) yet.</div>
+            }
+            else
+            {
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr><th>Category</th><th class="text-end">Monthly limit</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var b in Model.Budgets)
+                        {
+                            <tr>
+                                <td><span class="color-dot" style="background:@b.CategoryColor"></span>@b.CategoryName</td>
+                                <td class="text-end fw-semibold">@Format.Money(b.Limit)</td>
+                                <td class="text-end">
+                                    <form asp-action="Delete" asp-route-id="@b.Id" method="post" class="d-inline"
+                                          onsubmit="return confirm('Remove this budget?');">
+                                        <input type="hidden" name="year" value="@Model.Year" />
+                                        <input type="hidden" name="month" value="@Model.Month" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h2 class="h5">Set a budget</h2>
+                <p class="small text-muted">Setting a limit for a category that already has one updates it.</p>
+                <form asp-action="Set" method="post">
+                    <input type="hidden" asp-for="Form.Year" />
+                    <input type="hidden" asp-for="Form.Month" />
+                    <div class="mb-3">
+                        <label asp-for="Form.CategoryId" class="form-label">Category</label>
+                        <select asp-for="Form.CategoryId" class="form-select"
+                                asp-items='new Microsoft.AspNetCore.Mvc.Rendering.SelectList(Model.Categories, "Id", "Name")'>
+                            <option value="">Choose a category…</option>
+                        </select>
+                        <span asp-validation-for="Form.CategoryId" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Form.Limit" class="form-label">Monthly limit (€)</label>
+                        <input asp-for="Form.Limit" type="number" step="0.01" min="0.01" class="form-control" />
+                        <span asp-validation-for="Form.Limit" class="text-danger small"></span>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save budget</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

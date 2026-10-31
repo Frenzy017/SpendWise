@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - SpendWise</title>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="bg-body-tertiary">
+    <header>
+        <nav class="navbar navbar-expand-md navbar-dark bg-primary mb-4">
+            <div class="container">
+                <a class="navbar-brand fw-semibold" asp-controller="Home" asp-action="Index">SpendWise</a>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                            aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <div class="collapse navbar-collapse" id="mainNav">
+                        <ul class="navbar-nav me-auto">
+                            <li class="nav-item"><a class="nav-link" asp-controller="Home" asp-action="Index">Dashboard</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Expenses" asp-action="Index">Expenses</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Budgets" asp-action="Index">Budgets</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Categories" asp-action="Index">Categories</a></li>
+                            @* Admin links only for admins (FR-WEB-04) *@
+                            @if (User.IsInRole(Roles.Admin))
+                            {
+                                <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="Users">Admin › Users</a></li>
+                            }
+                        </ul>
+                        <form asp-controller="Account" asp-action="Logout" method="post" class="d-flex align-items-center gap-2">
+                            <span class="navbar-text text-white-50 small">
+                                @User.Identity.Name
+                                @if (User.IsInRole(Roles.Admin)) { <span class="badge text-bg-warning ms-1">Admin</span> }
+                            </span>
+                            <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
+                        </form>
+                    </div>
+                }
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        <main role="main" class="pb-4">
+            <partial name="_Alerts" />
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="border-top py-3 mt-4 text-muted small">
+        <div class="container">SpendWise · monthly expense tracker</div>
+    </footer>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,45 @@
+html {
+  font-size: 15px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+.narrow-card {
+  max-width: 440px;
+}
+
+.form-card {
+  max-width: 620px;
+}
+
+.month-label {
+  min-width: 9.5rem;
+}
+
+.color-dot {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  vertical-align: baseline;
+}
+
+.budget-bar {
+  height: 0.35rem;
+  max-width: 12rem;
+}
+
+.chart-box {
+  width: 100%;
+  max-width: 320px;
+}
+
+.trend-box {
+  position: relative;
+  height: 260px;
+}

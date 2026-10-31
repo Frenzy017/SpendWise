@@ -1,0 +1,11 @@
+@model string
+@{
+    ViewData["Title"] = "Something went wrong";
+}
+<div class="card shadow-sm mx-auto narrow-card">
+    <div class="card-body text-center py-5">
+        <h1 class="h4">Something went wrong</h1>
+        <p class="text-muted mb-4">@Model</p>
+        <a class="btn btn-primary" asp-controller="Home" asp-action="Index">Back to the dashboard</a>
+    </div>
+</div>
